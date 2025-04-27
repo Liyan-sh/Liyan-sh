@@ -1,12 +1,25 @@
-- 👋 Hi, I’m @Liyan-sh
-- 👀 I’m interested in ...
-- 🌱 I’m currently learning ...
-- 💞️ I’m looking to collaborate on ...
-- 📫 How to reach me ...
-- 😄 Pronouns: ...
-- ⚡ Fun fact: ...
-
-<!---
-Liyan-sh/Liyan-sh is a ✨ special ✨ repository because its `README.md` (this file) appears on your GitHub profile.
-You can click the Preview link to take a look at your changes.
---->
+#include <iostream>
+using namespace std;
+int msin()
+{
+	int r,c;
+	cout<< "row";
+	cin>> r;
+	cout<<" column ";
+	cin>> c;
+	int a [r] [c],i,j;
+	for (i=0;i<r;i++)
+	{ for (j=0;j<c ; j++)
+	{
+		cout<<"a["<<i<<"]["<<j<<"]=";
+		cin>>a[i][j];
+	}
+cout <<"\n";
+}
+for (i=0;i<r;i++)
+	for (j=0;j<c ; j++)
+	{
+		cout<<a[i][j];
+		cin>>a[i][j];
+	}
+cout <<"\n";
