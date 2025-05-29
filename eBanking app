@@ -1,0 +1,1523 @@
+import java.awt.*;
+import java.util.List;
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+
+public class AdminPanel extends JFrame {
+    private JTable userTable;
+    private JButton refreshBtn, logoutBtn, blockBtn, deleteBtn;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public AdminPanel() {
+        setTitle("Admin Panel - User Information");
+        setSize(800, 450);
+        setLocationRelativeTo(null);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLayout(new BorderLayout());
+
+        getContentPane().setBackground(DARK_PINK);
+
+        String[] columnNames = {"NID", "Username", "DOB", "Address", "Sex", "Phone", "Balance", "Blocked"};
+        DefaultTableModel model = new DefaultTableModel(columnNames, 0) {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false; // Make table non-editable directly
+            }
+        };
+        userTable = new JTable(model);
+        userTable.setFillsViewportHeight(true);
+        userTable.setBackground(DARK_PINK.darker());
+        userTable.setForeground(FONT_WHITE);
+        userTable.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        userTable.getTableHeader().setBackground(DARK_PINK.darker());
+        userTable.getTableHeader().setForeground(FONT_WHITE);
+        JScrollPane scrollPane = new JScrollPane(userTable);
+        add(scrollPane, BorderLayout.CENTER);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        buttonPanel.setBackground(DARK_PINK);
+
+        refreshBtn = new JButton("Refresh");
+        refreshBtn.setBackground(DARK_PINK.darker());
+        refreshBtn.setForeground(FONT_WHITE);
+
+        blockBtn = new JButton("Block/Unblock User");
+        blockBtn.setBackground(DARK_PINK.darker());
+        blockBtn.setForeground(FONT_WHITE);
+
+        deleteBtn = new JButton("Delete User");
+        deleteBtn.setBackground(DARK_PINK.darker());
+        deleteBtn.setForeground(FONT_WHITE);
+
+        logoutBtn = new JButton("Logout");
+        logoutBtn.setBackground(DARK_PINK.darker());
+        logoutBtn.setForeground(FONT_WHITE);
+
+        buttonPanel.add(refreshBtn);
+        buttonPanel.add(blockBtn);
+        buttonPanel.add(deleteBtn);
+        buttonPanel.add(logoutBtn);
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        refreshBtn.addActionListener(e -> loadUsers(model));
+        logoutBtn.addActionListener(e -> {
+            dispose();
+            new LoginScreen();
+        });
+
+        blockBtn.addActionListener(e -> toggleBlockUser(model));
+        deleteBtn.addActionListener(e -> deleteUser(model));
+
+        loadUsers(model);
+
+        setVisible(true);
+    }
+
+    private void loadUsers(DefaultTableModel model) {
+        model.setRowCount(0);
+        List<User> users = Utils.loadUsers();
+        for (User user : users) {
+            Object[] row = {
+                user.getNid(),
+                user.getUsername(),
+                user.getDob(),
+                user.getAddress(),
+                user.getSex(),
+                user.getPhone(),
+                user.getBalance(),
+                user.isBlocked() ? "Yes" : "No"
+            };
+            model.addRow(row);
+        }
+    }
+
+    private void toggleBlockUser(DefaultTableModel model) {
+        int selectedRow = userTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a user to block/unblock.", "No Selection", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String phone = (String) model.getValueAt(selectedRow, 5);
+        List<User> users = Utils.loadUsers();
+        for (User user : users) {
+            if (user.getPhone().equals(phone)) {
+                user.setBlocked(!user.isBlocked());
+                Utils.saveUsers(users);
+                loadUsers(model);
+                JOptionPane.showMessageDialog(this, "User " + (user.isBlocked() ? "blocked." : "unblocked."));
+                return;
+            }
+        }
+    }
+
+    private void deleteUser(DefaultTableModel model) {
+        int selectedRow = userTable.getSelectedRow();
+        if (selectedRow == -1) {
+            JOptionPane.showMessageDialog(this, "Please select a user to delete.", "No Selection", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String phone = (String) model.getValueAt(selectedRow, 5);
+        List<User> users = Utils.loadUsers();
+        User toRemove = null;
+        for (User user : users) {
+            if (user.getPhone().equals(phone)) {
+                toRemove = user;
+                break;
+            }
+        }
+        if (toRemove != null) {
+            int confirm = JOptionPane.showConfirmDialog(this, "Are you sure you want to delete user " + toRemove.getUsername() + "?", "Confirm Delete", JOptionPane.YES_NO_OPTION);
+            if (confirm == JOptionPane.YES_OPTION) {
+                users.remove(toRemove);
+                Utils.saveUsers(users);
+                loadUsers(model);
+                JOptionPane.showMessageDialog(this, "User deleted.");
+            }
+        }
+    }
+}
+
+
+import java.awt.*;
+import javax.swing.*;
+
+public class BillPaymentWindow extends JFrame {
+    private JComboBox<String> billTypeBox;
+    private JTextField amountField;
+    private JButton payBtn;
+    private User user;
+    private Dashboard dashboard;
+    private JPasswordField pinField;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public BillPaymentWindow(User user, Dashboard dashboard) {
+        this.user = user;
+        this.dashboard = dashboard;
+
+        setTitle("Pay Bills");
+        setSize(350, 250);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Set frame background color
+        getContentPane().setBackground(DARK_PINK);
+
+        JPanel mainPanel = new JPanel(new GridBagLayout());
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        mainPanel.setBackground(DARK_PINK);
+        add(mainPanel, BorderLayout.CENTER);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel billTypeLabel = new JLabel("Bill Type:");
+        billTypeLabel.setForeground(FONT_WHITE);
+        mainPanel.add(billTypeLabel, gbc);
+
+        gbc.gridx = 1;
+        billTypeBox = new JComboBox<>(new String[]{"Electricity", "WiFi", "Shopping"});
+        billTypeBox.setBackground(DARK_PINK.darker());
+        billTypeBox.setForeground(FONT_WHITE);
+        mainPanel.add(billTypeBox, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel amountLabel = new JLabel("Amount:");
+        amountLabel.setForeground(FONT_WHITE);
+        mainPanel.add(amountLabel, gbc);
+
+        gbc.gridx = 1;
+        amountField = new JTextField(15);
+        amountField.setBackground(DARK_PINK.darker());
+        amountField.setForeground(FONT_WHITE);
+        mainPanel.add(amountField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        JLabel pinLabel = new JLabel("Enter PIN:");
+        pinLabel.setForeground(FONT_WHITE);
+        mainPanel.add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        mainPanel.add(pinField, gbc);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.setBackground(DARK_PINK);
+        payBtn = new JButton("Pay");
+        payBtn.setPreferredSize(new Dimension(120, 35));
+        payBtn.setBackground(DARK_PINK.darker());
+        payBtn.setForeground(FONT_WHITE);
+        buttonPanel.add(payBtn);
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        payBtn.addActionListener(e -> {
+            String billType = (String) billTypeBox.getSelectedItem();
+            String enteredPin = new String(pinField.getPassword()).trim();
+            if (!enteredPin.equals(user.getPin())) {
+                showError("Incorrect PIN.");
+                return;
+            }
+            try {
+                double amount = Double.parseDouble(amountField.getText().trim());
+                if (amount <= 0 || user.getBalance() < amount) throw new NumberFormatException();
+                user.setBalance(user.getBalance() - amount);
+                Utils.saveUser(user);
+                Utils.logTransaction("Bill Payment: " + user.getPhone() + " paid ৳" + amount + " for " + billType);
+                JOptionPane.showMessageDialog(this, "Bill payment successful.");
+                dashboard.refreshBalance();
+                dispose();
+            } catch (NumberFormatException ex) {
+                showError("Invalid amount or insufficient balance.");
+            }
+        });
+
+        Font font = new Font("Segoe UI", Font.PLAIN, 14);
+        for (Component comp : mainPanel.getComponents()) {
+            comp.setFont(font);
+            if (comp instanceof JLabel) {
+                ((JLabel) comp).setForeground(FONT_WHITE);
+            }
+        }
+        payBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+        setVisible(true);
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+import java.awt.*;
+import javax.swing.*;
+
+public class CashInWindow extends JFrame {
+    private JTextField amountField;
+    private JTextField agentNumberField;
+    private JPasswordField pinField;
+    private JButton cashInBtn;
+    private User user;
+    private Dashboard dashboard;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public CashInWindow(User user, Dashboard dashboard) {
+        this.user = user;
+        this.dashboard = dashboard;
+
+        setTitle("Cash In");
+        setSize(350, 250);
+        setLocationRelativeTo(null);
+        setLayout(new GridBagLayout());
+
+        getContentPane().setBackground(DARK_PINK);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel amountLabel = new JLabel("Amount:");
+        amountLabel.setForeground(FONT_WHITE);
+        add(amountLabel, gbc);
+
+        gbc.gridx = 1;
+        amountField = new JTextField(15);
+        amountField.setBackground(DARK_PINK.darker());
+        amountField.setForeground(FONT_WHITE);
+        add(amountField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel agentLabel = new JLabel("ATM Agent Number:");
+        agentLabel.setForeground(FONT_WHITE);
+        add(agentLabel, gbc);
+
+        gbc.gridx = 1;
+        agentNumberField = new JTextField(15);
+        agentNumberField.setBackground(DARK_PINK.darker());
+        agentNumberField.setForeground(FONT_WHITE);
+        add(agentNumberField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        JLabel pinLabel = new JLabel("Enter PIN:");
+        pinLabel.setForeground(FONT_WHITE);
+        add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        add(pinField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        cashInBtn = new JButton("Cash In");
+        cashInBtn.setBackground(DARK_PINK.darker());
+        cashInBtn.setForeground(FONT_WHITE);
+        cashInBtn.setPreferredSize(new Dimension(120, 35));
+        add(cashInBtn, gbc);
+
+        cashInBtn.addActionListener(e -> {
+            String enteredPin = new String(pinField.getPassword()).trim();
+            if (!enteredPin.equals(user.getPin())) {
+                showError("Incorrect PIN.");
+                return;
+            }
+            String agentNumber = agentNumberField.getText().trim();
+            if (!agentNumber.matches("\\d{11}")) {
+                showError("ATM Agent Number must be exactly 11 digits.");
+                return;
+            }
+            try {
+                double amount = Double.parseDouble(amountField.getText().trim());
+                if (amount <= 0) throw new NumberFormatException();
+                user.setBalance(user.getBalance() + amount);
+                Utils.saveUser(user);
+                Utils.logTransaction("Cash In: " + user.getPhone() + " added ৳" + amount + " via ATM agent " + agentNumber);
+                JOptionPane.showMessageDialog(this, "৳" + amount + " added successfully.");
+                dashboard.refreshBalance();
+                dispose();
+            } catch (NumberFormatException ex) {
+                showError("Invalid amount.");
+            }
+        });
+
+        setVisible(true);
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+
+import java.awt.*;
+import javax.swing.*;
+
+public class CashOutWindow extends JFrame {
+    private JTextField amountField;
+    private JPasswordField pinField;
+    private JButton cashOutBtn;
+    private User user;
+    private Dashboard dashboard;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public CashOutWindow(User user, Dashboard dashboard) {
+        this.user = user;
+        this.dashboard = dashboard;
+
+        setTitle("Cash Out");
+        setSize(350, 220);
+        setLocationRelativeTo(null);
+        setLayout(new GridBagLayout());
+
+        getContentPane().setBackground(DARK_PINK);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel amountLabel = new JLabel("Amount:");
+        amountLabel.setForeground(FONT_WHITE);
+        add(amountLabel, gbc);
+
+        gbc.gridx = 1;
+        amountField = new JTextField(15);
+        amountField.setBackground(DARK_PINK.darker());
+        amountField.setForeground(FONT_WHITE);
+        add(amountField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel pinLabel = new JLabel("Enter PIN:");
+        pinLabel.setForeground(FONT_WHITE);
+        add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        add(pinField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        cashOutBtn = new JButton("Cash Out");
+        cashOutBtn.setBackground(DARK_PINK.darker());
+        cashOutBtn.setForeground(FONT_WHITE);
+        cashOutBtn.setPreferredSize(new Dimension(120, 35));
+        add(cashOutBtn, gbc);
+
+        cashOutBtn.addActionListener(e -> {
+            String enteredPin = new String(pinField.getPassword()).trim();
+            if (!enteredPin.equals(user.getPin())) {
+                showError("Incorrect PIN.");
+                return;
+            }
+            try {
+                double amount = Double.parseDouble(amountField.getText().trim());
+                if (amount <= 0 || user.getBalance() < amount) throw new NumberFormatException();
+                user.setBalance(user.getBalance() - amount);
+                Utils.saveUser(user);
+                Utils.logTransaction("Cash Out: " + user.getPhone() + " withdrew ৳" + amount);
+                JOptionPane.showMessageDialog(this, "৳" + amount + " withdrawn successfully.");
+                dashboard.refreshBalance();
+                dispose();
+            } catch (NumberFormatException ex) {
+                showError("Invalid amount or insufficient balance.");
+            }
+        });
+
+        setVisible(true);
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+
+import java.awt.*;
+import javax.swing.*;
+
+public class Dashboard extends JFrame {
+    private User currentUser;
+    private JLabel balanceLabel;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public Dashboard(User user) {
+        this.currentUser = user;
+
+        setTitle("Dashboard - eBanking App");
+        setSize(500, 450);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Set frame background color
+        getContentPane().setBackground(DARK_PINK);
+
+        // Balance Panel
+        JPanel topPanel = new JPanel();
+        topPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        topPanel.setBackground(DARK_PINK);
+        balanceLabel = new JLabel("Balance: ৳" + currentUser.getBalance());
+        balanceLabel.setFont(new Font("Segoe UI", Font.BOLD, 24));
+        balanceLabel.setForeground(FONT_WHITE);
+        topPanel.add(balanceLabel);
+        add(topPanel, BorderLayout.NORTH);
+
+        // Button Panel
+        JPanel centerPanel = new JPanel(new GridLayout(4, 2, 15, 15));
+        centerPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        centerPanel.setBackground(DARK_PINK);
+
+        JButton sendBtn = new JButton("Send Money");
+        sendBtn.setPreferredSize(new Dimension(140, 40));
+        sendBtn.setBackground(DARK_PINK.darker());
+        sendBtn.setForeground(FONT_WHITE);
+        JButton cashInBtn = new JButton("Cash In");
+        cashInBtn.setPreferredSize(new Dimension(140, 40));
+        cashInBtn.setBackground(DARK_PINK.darker());
+        cashInBtn.setForeground(FONT_WHITE);
+        JButton cashOutBtn = new JButton("Cash Out");
+        cashOutBtn.setPreferredSize(new Dimension(140, 40));
+        cashOutBtn.setBackground(DARK_PINK.darker());
+        cashOutBtn.setForeground(FONT_WHITE);
+        JButton rechargeBtn = new JButton("Mobile Recharge");
+        rechargeBtn.setPreferredSize(new Dimension(140, 40));
+        rechargeBtn.setBackground(DARK_PINK.darker());
+        rechargeBtn.setForeground(FONT_WHITE);
+        JButton billPayBtn = new JButton("Pay Bills");
+        billPayBtn.setPreferredSize(new Dimension(140, 40));
+        billPayBtn.setBackground(DARK_PINK.darker());
+        billPayBtn.setForeground(FONT_WHITE);
+        JButton historyBtn = new JButton("Transaction History");
+        historyBtn.setPreferredSize(new Dimension(140, 40));
+        historyBtn.setBackground(DARK_PINK.darker());
+        historyBtn.setForeground(FONT_WHITE);
+        JButton logoutBtn = new JButton("Logout");
+        logoutBtn.setPreferredSize(new Dimension(140, 40));
+        logoutBtn.setBackground(DARK_PINK.darker());
+        logoutBtn.setForeground(FONT_WHITE);
+
+        Font btnFont = new Font("Segoe UI", Font.BOLD, 14);
+        sendBtn.setFont(btnFont);
+        cashInBtn.setFont(btnFont);
+        cashOutBtn.setFont(btnFont);
+        rechargeBtn.setFont(btnFont);
+        billPayBtn.setFont(btnFont);
+        historyBtn.setFont(btnFont);
+        logoutBtn.setFont(btnFont);
+
+        centerPanel.add(sendBtn);
+        centerPanel.add(cashInBtn);
+        centerPanel.add(cashOutBtn);
+        centerPanel.add(rechargeBtn);
+        centerPanel.add(billPayBtn);
+        centerPanel.add(historyBtn);
+        centerPanel.add(logoutBtn);
+
+        add(centerPanel, BorderLayout.CENTER);
+
+        // Button Actions
+        sendBtn.addActionListener(e -> new SendMoneyWindow(currentUser, this));
+        cashInBtn.addActionListener(e -> new CashInWindow(currentUser, this));
+        cashOutBtn.addActionListener(e -> new CashOutWindow(currentUser, this));
+        rechargeBtn.addActionListener(e -> new RechargeWindow(currentUser, this));
+        billPayBtn.addActionListener(e -> new BillPaymentWindow(currentUser, this));
+        historyBtn.addActionListener(e -> new HistoryWindow(currentUser));
+        logoutBtn.addActionListener(e -> {
+            JOptionPane.showMessageDialog(this, "Logged out.");
+            dispose();
+            new LoginScreen();
+        });
+
+        setVisible(true);
+    }
+
+    // To refresh balance after any transaction
+    public void refreshBalance() {
+        balanceLabel.setText("Balance: ৳" + currentUser.getBalance());
+    }
+}
+
+
+
+
+import java.awt.Color;
+import java.io.*;
+import javax.swing.*;
+
+public class HistoryWindow extends JFrame {
+    public HistoryWindow(User user) {
+        setTitle("Transaction History");
+        setSize(500, 400);
+        setLocationRelativeTo(null);
+
+        JTextArea area = new JTextArea();
+        area.setEditable(false);
+        area.setBackground(Color.BLACK);
+        area.setForeground(Color.RED);
+        JScrollPane scroll = new JScrollPane(area);
+        scroll.getViewport().setBackground(Color.BLACK);
+        add(scroll);
+
+try (BufferedReader br = new BufferedReader(new FileReader("data/transactions.txt"))) {
+            String line;
+            while ((line = br.readLine()) != null) {
+                if (line.contains(user.getPhone())) {
+                    area.append(line + "\n");
+                }
+            }
+        } catch (IOException e) {
+            area.setText("No history found.");
+        }
+
+        setVisible(true);
+    }
+}
+
+
+
+
+import java.awt.*;
+import java.io.*;
+import java.nio.file.*;
+import java.util.List;
+import javax.swing.*;
+
+public class LoginScreen extends JFrame {
+    private JTextField phoneField;
+    private JPasswordField pinField;
+    private JButton loginBtn, registerBtn;
+    private JCheckBox adminCheckBox;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public LoginScreen() {
+        setTitle("Login - eBanking App");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Set frame background color
+        getContentPane().setBackground(DARK_PINK);
+
+        // Main panel with padding
+        JPanel mainPanel = new JPanel(new GridBagLayout());
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        mainPanel.setBackground(DARK_PINK);
+        add(mainPanel, BorderLayout.CENTER);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel phoneLabel = new JLabel("Phone Number / Admin Username:");
+        phoneLabel.setForeground(FONT_WHITE);
+        mainPanel.add(phoneLabel, gbc);
+
+        gbc.gridx = 1;
+        phoneField = new JTextField(15);
+        phoneField.setBackground(DARK_PINK.darker());
+        phoneField.setForeground(FONT_WHITE);
+        mainPanel.add(phoneField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel pinLabel = new JLabel("PIN / Password:");
+        pinLabel.setForeground(FONT_WHITE);
+        mainPanel.add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        mainPanel.add(pinField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        gbc.gridwidth = 2;
+        adminCheckBox = new JCheckBox("Login as Admin");
+        adminCheckBox.setBackground(DARK_PINK);
+        adminCheckBox.setForeground(FONT_WHITE);
+        mainPanel.add(adminCheckBox, gbc);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
+        buttonPanel.setBackground(DARK_PINK);
+        loginBtn = new JButton("Login");
+        loginBtn.setPreferredSize(new Dimension(120, 35));
+        loginBtn.setBackground(DARK_PINK.darker());
+        loginBtn.setForeground(FONT_WHITE);
+        registerBtn = new JButton("Register");
+        registerBtn.setPreferredSize(new Dimension(120, 35));
+        registerBtn.setBackground(DARK_PINK.darker());
+        registerBtn.setForeground(FONT_WHITE);
+        buttonPanel.add(loginBtn);
+        buttonPanel.add(registerBtn);
+
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        loginBtn.addActionListener(e -> handleLogin());
+        registerBtn.addActionListener(e -> {
+            dispose();
+            new RegisterScreen();
+        });
+
+        // Set font for all labels and buttons
+        Font font = new Font("Segoe UI", Font.PLAIN, 14);
+        for (Component comp : mainPanel.getComponents()) {
+            comp.setFont(font);
+            if (comp instanceof JLabel) {
+                ((JLabel) comp).setForeground(FONT_WHITE);
+            }
+        }
+        loginBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        registerBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        adminCheckBox.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+
+        pack();
+        setMinimumSize(getSize());
+        setVisible(true);
+    }
+
+    private void handleLogin() {
+        String usernameOrPhone = phoneField.getText().trim();
+        String pinOrPassword = new String(pinField.getPassword()).trim();
+
+        if (adminCheckBox.isSelected()) {
+            // Admin login
+            if (isValidAdmin(usernameOrPhone, pinOrPassword)) {
+                JOptionPane.showMessageDialog(this, "Admin login successful!", "Welcome Admin", JOptionPane.INFORMATION_MESSAGE);
+                dispose();
+                new AdminPanel();
+            } else {
+                showError("Invalid admin username or password.");
+            }
+        } else {
+            // User login
+            if (!Utils.isValidPhone(usernameOrPhone)) {
+                showError("Phone number must be 11 digits.");
+                return;
+            }
+
+            if (!Utils.isValidPin(pinOrPassword)) {
+                showError("PIN must be 5 digits.");
+                return;
+            }
+
+            List<User> users = Utils.loadUsers();
+            User user = Utils.findUserByPhone(usernameOrPhone, users);
+
+            if (user != null && user.getPin().equals(pinOrPassword)) {
+                JOptionPane.showMessageDialog(this, "Login successful!", "Welcome", JOptionPane.INFORMATION_MESSAGE);
+                dispose();
+                new Dashboard(user);
+            } else {
+                showError("Invalid phone number or PIN.");
+            }
+        }
+    }
+
+    private boolean isValidAdmin(String username, String password) {
+        Path adminFile = Paths.get("data/admin.txt");
+        try {
+            List<String> lines = Files.readAllLines(adminFile);
+            for (String line : lines) {
+                String[] parts = line.split(",");
+                if (parts.length == 2) {
+                    String adminUser = parts[0].trim();
+                    String adminPass = parts[1].trim();
+                    if (adminUser.equals(username) && adminPass.equals(password)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Login Failed", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public static void main(String[] args) {
+        new LoginScreen();
+    }
+}
+
+
+
+
+import java.awt.*;
+import javax.swing.*;
+
+public class RechargeWindow extends JFrame {
+    private JTextField numberField, amountField;
+    private JPasswordField pinField;
+    private JButton rechargeBtn;
+    private User user;
+    private Dashboard dashboard;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public RechargeWindow(User user, Dashboard dashboard) {
+        this.user = user;
+        this.dashboard = dashboard;
+
+        setTitle("Mobile Recharge");
+        setSize(350, 250);
+        setLocationRelativeTo(null);
+        setLayout(new GridBagLayout());
+
+        getContentPane().setBackground(DARK_PINK);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel numberLabel = new JLabel("Mobile Number:");
+        numberLabel.setForeground(FONT_WHITE);
+        add(numberLabel, gbc);
+
+        gbc.gridx = 1;
+        numberField = new JTextField(15);
+        numberField.setBackground(DARK_PINK.darker());
+        numberField.setForeground(FONT_WHITE);
+        add(numberField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel amountLabel = new JLabel("Amount:");
+        amountLabel.setForeground(FONT_WHITE);
+        add(amountLabel, gbc);
+
+        gbc.gridx = 1;
+        amountField = new JTextField(15);
+        amountField.setBackground(DARK_PINK.darker());
+        amountField.setForeground(FONT_WHITE);
+        add(amountField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        JLabel pinLabel = new JLabel("Enter PIN:");
+        pinLabel.setForeground(FONT_WHITE);
+        add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        add(pinField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        rechargeBtn = new JButton("Recharge");
+        rechargeBtn.setBackground(DARK_PINK.darker());
+        rechargeBtn.setForeground(FONT_WHITE);
+        rechargeBtn.setPreferredSize(new Dimension(120, 35));
+        add(rechargeBtn, gbc);
+
+        rechargeBtn.addActionListener(e -> {
+            String number = numberField.getText().trim();
+            String enteredPin = new String(pinField.getPassword()).trim();
+            if (!enteredPin.equals(user.getPin())) {
+                showError("Incorrect PIN.");
+                return;
+            }
+            try {
+                double amount = Double.parseDouble(amountField.getText().trim());
+                if (!Utils.isValidPhone(number) || amount <= 0 || user.getBalance() < amount) throw new NumberFormatException();
+                user.setBalance(user.getBalance() - amount);
+                Utils.saveUser(user);
+                Utils.logTransaction("Mobile Recharge: " + user.getPhone() + " recharged " + number + " ৳" + amount);
+                JOptionPane.showMessageDialog(this, "Recharge successful.");
+                dashboard.refreshBalance();
+                dispose();
+            } catch (NumberFormatException ex) {
+                showError("Invalid input or insufficient balance.");
+            }
+        });
+
+        setVisible(true);
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+
+
+import java.awt.*;
+import java.util.List;
+import javax.swing.*;
+
+public class RegisterScreen extends JFrame {
+    private JTextField nidField, usernameField, dobField, addressField, phoneField;
+    private JPasswordField pinField;
+    private JComboBox<String> sexBox;
+    private JButton registerBtn, backBtn;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public RegisterScreen() {
+        setTitle("Register - eBanking App");
+        setSize(450, 500);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+        // Set frame background color
+        getContentPane().setBackground(DARK_PINK);
+
+        JPanel mainPanel = new JPanel(new GridBagLayout());
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        mainPanel.setBackground(DARK_PINK);
+        add(mainPanel, BorderLayout.CENTER);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel nidLabel = new JLabel("NID (11 digits):");
+        nidLabel.setForeground(FONT_WHITE);
+        mainPanel.add(nidLabel, gbc);
+
+        gbc.gridx = 1;
+        nidField = new JTextField(15);
+        nidField.setBackground(DARK_PINK.darker());
+        nidField.setForeground(FONT_WHITE);
+        mainPanel.add(nidField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel usernameLabel = new JLabel("Username:");
+        usernameLabel.setForeground(FONT_WHITE);
+        mainPanel.add(usernameLabel, gbc);
+
+        gbc.gridx = 1;
+        usernameField = new JTextField(15);
+        usernameField.setBackground(DARK_PINK.darker());
+        usernameField.setForeground(FONT_WHITE);
+        mainPanel.add(usernameField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        JLabel dobLabel = new JLabel("Date of Birth (DD/MM/YYYY):");
+        dobLabel.setForeground(FONT_WHITE);
+        mainPanel.add(dobLabel, gbc);
+
+        gbc.gridx = 1;
+        dobField = new JTextField(15);
+        dobField.setBackground(DARK_PINK.darker());
+        dobField.setForeground(FONT_WHITE);
+        mainPanel.add(dobField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        JLabel addressLabel = new JLabel("Address:");
+        addressLabel.setForeground(FONT_WHITE);
+        mainPanel.add(addressLabel, gbc);
+
+        gbc.gridx = 1;
+        addressField = new JTextField(15);
+        addressField.setBackground(DARK_PINK.darker());
+        addressField.setForeground(FONT_WHITE);
+        mainPanel.add(addressField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 4;
+        JLabel sexLabel = new JLabel("Sex:");
+        sexLabel.setForeground(FONT_WHITE);
+        mainPanel.add(sexLabel, gbc);
+
+        gbc.gridx = 1;
+        sexBox = new JComboBox<>(new String[]{"Male", "Female", "Other"});
+        sexBox.setBackground(DARK_PINK.darker());
+        sexBox.setForeground(FONT_WHITE);
+        mainPanel.add(sexBox, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 5;
+        JLabel phoneLabel = new JLabel("Phone Number (11 digits):");
+        phoneLabel.setForeground(FONT_WHITE);
+        mainPanel.add(phoneLabel, gbc);
+
+        gbc.gridx = 1;
+        phoneField = new JTextField(15);
+        phoneField.setBackground(DARK_PINK.darker());
+        phoneField.setForeground(FONT_WHITE);
+        mainPanel.add(phoneField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 6;
+        JLabel pinLabel = new JLabel("PIN (5 digits):");
+        pinLabel.setForeground(FONT_WHITE);
+        mainPanel.add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        mainPanel.add(pinField, gbc);
+
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 20, 10));
+        buttonPanel.setBackground(DARK_PINK);
+        registerBtn = new JButton("Register");
+        registerBtn.setPreferredSize(new Dimension(120, 35));
+        registerBtn.setBackground(DARK_PINK.darker());
+        registerBtn.setForeground(FONT_WHITE);
+        backBtn = new JButton("Back");
+        backBtn.setPreferredSize(new Dimension(120, 35));
+        backBtn.setBackground(DARK_PINK.darker());
+        backBtn.setForeground(FONT_WHITE);
+        buttonPanel.add(registerBtn);
+        buttonPanel.add(backBtn);
+
+        add(buttonPanel, BorderLayout.SOUTH);
+
+        registerBtn.addActionListener(e -> handleRegister());
+        backBtn.addActionListener(e -> {
+            dispose();
+            new LoginScreen();
+        });
+
+        Font font = new Font("Segoe UI", Font.PLAIN, 14);
+        for (Component comp : mainPanel.getComponents()) {
+            comp.setFont(font);
+            if (comp instanceof JLabel) {
+                ((JLabel) comp).setForeground(FONT_WHITE);
+            }
+        }
+        registerBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        backBtn.setFont(new Font("Segoe UI", Font.BOLD, 14));
+
+        setVisible(true);
+    }
+
+    private void handleRegister() {
+        String nid = nidField.getText().trim();
+        String username = usernameField.getText().trim();
+        String dob = dobField.getText().trim();
+        String address = addressField.getText().trim();
+        String sex = (String) sexBox.getSelectedItem();
+        String phone = phoneField.getText().trim();
+        String pin = new String(pinField.getPassword()).trim();
+
+        if (!Utils.isValidNid(nid)) {
+            showError("NID must be exactly 11 digits.");
+            return;
+        }
+
+        if (!Utils.isValidPhone(phone)) {
+            showError("Phone number must be exactly 11 digits.");
+            return;
+        }
+
+        if (!Utils.isValidPin(pin)) {
+            showError("PIN must be exactly 5 digits.");
+            return;
+        }
+
+        List<User> users = Utils.loadUsers();
+        if (Utils.findUserByPhone(phone, users) != null) {
+            showError("Phone number already registered.");
+            return;
+        }
+
+        User newUser = new User(nid, username, dob, address, sex, phone, pin, 0.0, false);
+        users.add(newUser);
+        Utils.saveUsers(users);
+
+        JOptionPane.showMessageDialog(this, "Registration successful!", "Success", JOptionPane.INFORMATION_MESSAGE);
+        dispose();
+        new LoginScreen();
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+
+    public static void main(String[] args) {
+        new RegisterScreen();
+    }
+}
+
+import java.awt.*;
+import java.util.List;
+import javax.swing.*;
+
+public class SendMoneyWindow extends JFrame {
+    private JTextField receiverField, amountField;
+    private JPasswordField pinField;
+    private JButton sendBtn;
+    private User sender;
+    private Dashboard dashboard;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public SendMoneyWindow(User sender, Dashboard dashboard) {
+        this.sender = sender;
+        this.dashboard = dashboard;
+
+        setTitle("Send Money");
+        setSize(400, 260);
+        setLocationRelativeTo(null);
+        setLayout(new GridBagLayout());
+
+        getContentPane().setBackground(DARK_PINK);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel receiverLabel = new JLabel("Receiver Phone:");
+        receiverLabel.setForeground(FONT_WHITE);
+        add(receiverLabel, gbc);
+
+        gbc.gridx = 1;
+        receiverField = new JTextField(15);
+        receiverField.setBackground(DARK_PINK.darker());
+        receiverField.setForeground(FONT_WHITE);
+        add(receiverField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel amountLabel = new JLabel("Amount:");
+        amountLabel.setForeground(FONT_WHITE);
+        add(amountLabel, gbc);
+
+        gbc.gridx = 1;
+        amountField = new JTextField(15);
+        amountField.setBackground(DARK_PINK.darker());
+        amountField.setForeground(FONT_WHITE);
+        add(amountField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        JLabel pinLabel = new JLabel("Enter PIN:");
+        pinLabel.setForeground(FONT_WHITE);
+        add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        add(pinField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        sendBtn = new JButton("Send");
+        sendBtn.setBackground(DARK_PINK.darker());
+        sendBtn.setForeground(FONT_WHITE);
+        sendBtn.setPreferredSize(new Dimension(120, 35));
+        add(sendBtn, gbc);
+
+        sendBtn.addActionListener(e -> handleSend());
+
+        setVisible(true);
+    }
+
+    private void handleSend() {
+        String receiverPhone = receiverField.getText().trim();
+        String amountText = amountField.getText().trim();
+        String enteredPin = new String(pinField.getPassword()).trim();
+
+        if (!enteredPin.equals(sender.getPin())) {
+            showError("Incorrect PIN.");
+            return;
+        }
+
+        if (!Utils.isValidPhone(receiverPhone)) {
+            showError("Invalid phone number.");
+            return;
+        }
+
+        if (receiverPhone.equals(sender.getPhone())) {
+            showError("You cannot send money to yourself.");
+            return;
+        }
+
+        double amount;
+        try {
+            amount = Double.parseDouble(amountText);
+            if (amount <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            showError("Amount must be a positive number.");
+            return;
+        }
+
+        List<User> users = Utils.loadUsers();
+        User receiver = Utils.findUserByPhone(receiverPhone, users);
+        if (receiver == null) {
+            showError("Receiver not found.");
+            return;
+        }
+
+        if (sender.getBalance() < amount) {
+            showError("Insufficient balance.");
+            return;
+        }
+
+        // Transfer money
+        sender.setBalance(sender.getBalance() - amount);
+        receiver.setBalance(receiver.getBalance() + amount);
+        Utils.saveUsers(users);
+
+        // Log transaction
+        String msg = "Send Money: " + sender.getPhone() + " sent ৳" + amount + " to " + receiver.getPhone();
+        Utils.logTransaction(msg);
+
+        // Show confirmation messages
+        JOptionPane.showMessageDialog(this, "You sent ৳" + amount + " to " + receiver.getUsername(), "Success", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, "You received ৳" + amount + " from " + sender.getUsername(), "Notification to Receiver", JOptionPane.INFORMATION_MESSAGE);
+
+        dashboard.refreshBalance();
+        dispose();
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+
+import java.awt.*;
+import java.util.List;
+import javax.swing.*;
+
+public class SendMoneyWindow extends JFrame {
+    private JTextField receiverField, amountField;
+    private JPasswordField pinField;
+    private JButton sendBtn;
+    private User sender;
+    private Dashboard dashboard;
+
+    private static final Color DARK_PINK = new Color(139, 0, 139);
+    private static final Color FONT_WHITE = Color.WHITE;
+
+    public SendMoneyWindow(User sender, Dashboard dashboard) {
+        this.sender = sender;
+        this.dashboard = dashboard;
+
+        setTitle("Send Money");
+        setSize(400, 260);
+        setLocationRelativeTo(null);
+        setLayout(new GridBagLayout());
+
+        getContentPane().setBackground(DARK_PINK);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        JLabel receiverLabel = new JLabel("Receiver Phone:");
+        receiverLabel.setForeground(FONT_WHITE);
+        add(receiverLabel, gbc);
+
+        gbc.gridx = 1;
+        receiverField = new JTextField(15);
+        receiverField.setBackground(DARK_PINK.darker());
+        receiverField.setForeground(FONT_WHITE);
+        add(receiverField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 1;
+        JLabel amountLabel = new JLabel("Amount:");
+        amountLabel.setForeground(FONT_WHITE);
+        add(amountLabel, gbc);
+
+        gbc.gridx = 1;
+        amountField = new JTextField(15);
+        amountField.setBackground(DARK_PINK.darker());
+        amountField.setForeground(FONT_WHITE);
+        add(amountField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
+        JLabel pinLabel = new JLabel("Enter PIN:");
+        pinLabel.setForeground(FONT_WHITE);
+        add(pinLabel, gbc);
+
+        gbc.gridx = 1;
+        pinField = new JPasswordField(15);
+        pinField.setBackground(DARK_PINK.darker());
+        pinField.setForeground(FONT_WHITE);
+        add(pinField, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 3;
+        gbc.gridwidth = 2;
+        gbc.anchor = GridBagConstraints.CENTER;
+        sendBtn = new JButton("Send");
+        sendBtn.setBackground(DARK_PINK.darker());
+        sendBtn.setForeground(FONT_WHITE);
+        sendBtn.setPreferredSize(new Dimension(120, 35));
+        add(sendBtn, gbc);
+
+        sendBtn.addActionListener(e -> handleSend());
+
+        setVisible(true);
+    }
+
+    private void handleSend() {
+        String receiverPhone = receiverField.getText().trim();
+        String amountText = amountField.getText().trim();
+        String enteredPin = new String(pinField.getPassword()).trim();
+
+        if (!enteredPin.equals(sender.getPin())) {
+            showError("Incorrect PIN.");
+            return;
+        }
+
+        if (!Utils.isValidPhone(receiverPhone)) {
+            showError("Invalid phone number.");
+            return;
+        }
+
+        if (receiverPhone.equals(sender.getPhone())) {
+            showError("You cannot send money to yourself.");
+            return;
+        }
+
+        double amount;
+        try {
+            amount = Double.parseDouble(amountText);
+            if (amount <= 0) throw new NumberFormatException();
+        } catch (NumberFormatException e) {
+            showError("Amount must be a positive number.");
+            return;
+        }
+
+        List<User> users = Utils.loadUsers();
+        User receiver = Utils.findUserByPhone(receiverPhone, users);
+        if (receiver == null) {
+            showError("Receiver not found.");
+            return;
+        }
+
+        if (sender.getBalance() < amount) {
+            showError("Insufficient balance.");
+            return;
+        }
+
+        // Transfer money
+        sender.setBalance(sender.getBalance() - amount);
+        receiver.setBalance(receiver.getBalance() + amount);
+        Utils.saveUsers(users);
+
+        // Log transaction
+        String msg = "Send Money: " + sender.getPhone() + " sent ৳" + amount + " to " + receiver.getPhone();
+        Utils.logTransaction(msg);
+
+        // Show confirmation messages
+        JOptionPane.showMessageDialog(this, "You sent ৳" + amount + " to " + receiver.getUsername(), "Success", JOptionPane.INFORMATION_MESSAGE);
+        JOptionPane.showMessageDialog(this, "You received ৳" + amount + " from " + sender.getUsername(), "Notification to Receiver", JOptionPane.INFORMATION_MESSAGE);
+
+        dashboard.refreshBalance();
+        dispose();
+    }
+
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
+
+
+
+import java.io.*;
+import java.util.*;
+
+public class Utils {
+    public static final String USERS_FILE = "data/users.txt";
+    public static final String TX_FILE = "data/transactions.txt";
+
+    // Load all users from file
+    public static List<User> loadUsers() {
+        List<User> users = new ArrayList<>();
+        try {
+            File file = new File(USERS_FILE);
+            if (!file.exists()) {
+                file.getParentFile().mkdirs();
+                file.createNewFile();
+            }
+
+            BufferedReader br = new BufferedReader(new FileReader(file));
+            String line;
+            while ((line = br.readLine()) != null) {
+                users.add(User.fromFileString(line));
+            }
+            br.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return users;
+    }
+
+    // Save all users to file
+    public static void saveUsers(List<User> users) {
+        try {
+            PrintWriter pw = new PrintWriter(new FileWriter(USERS_FILE));
+            for (User u : users) {
+                pw.println(u.toFileString());
+            }
+            pw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Save a single user's update
+    public static void saveUser(User user) {
+        List<User> users = loadUsers();
+        for (int i = 0; i < users.size(); i++) {
+            if (users.get(i).getPhone().equals(user.getPhone())) {
+                users.set(i, user);
+                break;
+            }
+        }
+        saveUsers(users);
+    }
+
+    // Append transaction to file
+    public static void logTransaction(String message) {
+        try {
+            File file = new File(TX_FILE);
+            if (!file.exists()) {
+                file.getParentFile().mkdirs();
+                file.createNewFile();
+            }
+
+            PrintWriter pw = new PrintWriter(new FileWriter(file, true));
+            pw.println(new Date() + " - " + message);
+            pw.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Validation methods
+    public static boolean isValidPhone(String phone) {
+        return phone.matches("\\d{11}");
+    }
+
+    public static boolean isValidPin(String pin) {
+        return pin.matches("\\d{5}");
+    }
+
+    public static boolean isValidNid(String nid) {
+        return nid.matches("\\d{11}");
+    }
+
+    // Find user by phone number
+    public static User findUserByPhone(String phone, List<User> users) {
+        for (User u : users) {
+            if (u.getPhone().equals(phone)) return u;
+        }
+        return null;
+    }
+}
+
+
+
+import java.awt.*;
+import javax.swing.*;
+
+public class WelcomeScreen extends JFrame {
+    public WelcomeScreen() {
+        setTitle("Welcome - eBanking App");
+        setSize(400, 300);
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout());
+
+       
+        Color darkPink = new Color(199, 21, 133); 
+        getContentPane().setBackground(darkPink);
+
+        JPanel mainPanel = new JPanel(new GridBagLayout());
+        mainPanel.setBackground(darkPink);
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
+        add(mainPanel, BorderLayout.CENTER);
+
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(10, 10, 10, 10);
+
+        JLabel welcomeLabel = new JLabel("Welcome to eBanking App");
+        welcomeLabel.setFont(new Font("Segoe UI", Font.BOLD, 20));
+        welcomeLabel.setForeground(Color.WHITE);
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        mainPanel.add(welcomeLabel, gbc);
+
+        JButton proceedBtn = new JButton("Proceed to Login");
+        proceedBtn.setPreferredSize(new Dimension(180, 40));
+        proceedBtn.setBackground(Color.WHITE);
+        proceedBtn.setForeground(darkPink);
+        proceedBtn.setFont(new Font("Segoe UI", Font.BOLD, 16));
+        gbc.gridy = 1;
+        mainPanel.add(proceedBtn, gbc);
+
+        proceedBtn.addActionListener(e -> {
+            dispose();
+            new LoginScreen();
+        });
+
+        setVisible(true);
+    }
+
+    public static void main(String[] args) {
+        new WelcomeScreen();
+    }
+}
+
